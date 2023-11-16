@@ -1,19 +1,807 @@
-# Starter pipeline
-# Start with a minimal pipeline that you can customize to build and deploy your code.
-# Add steps that build, run tests, deploy, and more:
-# https://aka.ms/yaml
-
+# Variable 'servBuildPassword' was defined in the Variables tab
+# Variable 'SqlCompareOptions' was defined in the Variables tab
+# Cron Schedules have been converted using UTC Time Zone and may need to be updated for your location
+variables:
+- name: BuildParameters.publishArtifact
+  value: true
+- name: BuildParameters.targetTrustServerCertificate
+  value: true
 trigger:
-- master
-
-pool:
-  vmImage: ubuntu-latest
-
-steps:
-- script: echo Hello, world!
-  displayName: 'Run a one-line script'
-
-- script: |
-    echo Add other tasks to build, test, and deploy your project.
-    echo See https://aka.ms/yaml
-  displayName: 'Run a multi-line script'
+  branches:
+    include:
+    - develop
+  batch: True
+schedules:
+- cron: 0 20 * * *
+  branches:
+    include:
+    - refs/heads/develop
+  always: true
+name: $(date:yy.MM.dd)$(rev:.r)
+resources:
+  repositories:
+  - repository: self
+    type: git
+    ref: refs/heads/develop
+jobs:
+- job: Phase_1
+  displayName: Agent job - Sync schema to QA databases
+  timeoutInMinutes: 600
+  pool:
+    name: Backend Custom Build Pool
+  steps:
+  - checkout: self
+    clean: true
+    fetchTags: false
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Build sch.RSMS
+    inputs:
+      operation: Build
+      dbFolder: RootFolder
+      packageName: sch.RSMS
+      tempServerTypeBuild: sqlServer
+      tempServerNameBuild: tst2db.renweb
+      tempTrustServerCertificateBuild: $(BuildParameters.targetTrustServerCertificate)
+      usernameBuild: _serv_build_VSTS
+      passwordBuild: $(servBuildPassword)
+      buildAdvanced: true
+      publishArtifact: $(BuildParameters.publishArtifact)
+      compareOptionsBuild: $(SqlCompareOptions)
+      nugetPackageVersionSelector: BuildNumber
+      nugetPackageVersion: $(Build.BuildNumber)
+      requiredVersion: 4.4.22258.31709
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_Automated
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_Automated
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to _model_RSMS
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: _model_RSMS
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_LMS
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_LMS
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_LocalDW
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_LocalDW
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_LocalSI
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_LocalSI
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: andrewlackenby.sql-toolkit.runsqlcommand.RunSqlCommand@2
+    displayName: Launch backup job for Docker SQL databases
+    inputs:
+      serverName: tst2db.renweb
+      databaseName: msdb
+      sqlCommand: "EXEC dbo.sp_start_job N'DatabaseBackup - Docker Databases - FULL copy only' ;  \nGO  "
+      userName: _serv_build_VSTS
+      userPassword: $(servBuildPassword)
+      queryTimeout: 300
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_Admissions
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_Admissions
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_AECAN
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_AECAN
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_AEFP
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_AEFP
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_AECP
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_AECP
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_AEENT
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_AEENT
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_AEPREMIER
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_AEPREMIER
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_AESB
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_AESB
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_AESIBASIC
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_AESIBASIC
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_AESIPREMIER
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_AESIPREMIER
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_DonorAL
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_DonorAL
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_EPAM
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_EPAM
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_EPAMENRL0
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_EPAMENRL0
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_EPAMENRL1
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_EPAMENRL1
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_EPAMENRL2
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_EPAMENRL2
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_EPAMENRL3
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_EPAMENRL3
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_EPAMENRL4
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_EPAMENRL4
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_EPAMENRL5
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_EPAMENRL5
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_FACTSAUTODW
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_FACTSAUTODW
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_FACTSAUTOSI
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_FACTSAUTOSI
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_FactsInt1
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_FactsInt1
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_FactsInt2
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_FactsInt2
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_FactsInt3
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_FactsInt3
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_FactsInt4
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_FactsInt4
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_FAE
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_FAE
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_FAE1
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_FAE1
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_FamilyApp
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_FamilyApp
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_FstsFactsInt
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_FstsFactsInt
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_GCIauto
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_GCIauto
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_Google1
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_Google1
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_Google2
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_Google2
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_IDOE1
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_IDOE1
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_IDOE2
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_IDOE2
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_jeisenga
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_jeisenga
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_MaintSched1
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_MaintSched1
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_MaintSched2
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_MaintSched2
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_Mobileapp
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_Mobileapp
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_NBSK12
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_NBSK12
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_Portal5
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_Portal5
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_Rams
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_Rams
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_RamsAR
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_RamsAR
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_RamsPJ
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_RamsPJ
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_SISDART1
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_SISDART1
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_SISDART2
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_SISDART2
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_SISDART3
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_SISDART3
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_SISDART4
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_SISDART4
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_Stakeholder
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_Stakeholder
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_StateRpt0
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_StateRpt0
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_StateRpt1
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_StateRpt1
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_StateRpt2
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_StateRpt2
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_StateRpt3
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_StateRpt3
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_Training
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_Training
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: redgatesoftware.redgateDlmAutomationBuild.DlmAutomationBuildTask.RedgateSqlChangeAutomationBuild@4
+    displayName: Sync sch.RSMS develop to TST_dtucker
+    inputs:
+      operation: Sync
+      packageIdSync: sch.RSMS
+      targetServerName: tst2db.renweb
+      targetDatabaseName: TST_dtucker
+      targetTrustServerCertificate: $(BuildParameters.targetTrustServerCertificate)
+      usernameSync: _serv_build_VSTS
+      passwordSync: $(servBuildPassword)
+      syncAdvanced: true
+      compareOptionsSync: $(SqlCompareOptions)
+      nugetPackageVersion: $(Build.BuildNumber)
+  - task: octopusdeploy.octopus-deploy-build-release-tasks.octopus-push.OctopusPush@3
+    displayName: Push Packages to Octopus
+    enabled: False
+    inputs:
+      OctoConnectedServiceName: d24117a3-bf5b-4943-8851-9d2210b5da10
+      Package: sch.RSMS.$(Build.BuildNumber).nupkg
+...
